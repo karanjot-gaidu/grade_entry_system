@@ -111,19 +111,41 @@ class ListGrades extends StatefulWidget {
 
 class _ListGradesState extends State<ListGrades> {
   List<Grade> grades = [];
+  List<Grade> filteredGrades = []; // Store filtered grades
   int? _selectedIndex;
+  TextEditingController searchController = TextEditingController(); // Controller for search bar
 
   @override
   void initState() {
     super.initState();
     _loadGrades();
+    filteredGrades = grades; // Initialize filtered grades
+    searchController.addListener(_filterGrades); // Listen for changes in search input
   }
 
   Future<void> _loadGrades() async {
     final loadedGrades = await GradesModel().getAllGrades();
     setState(() {
       grades = loadedGrades;
+      filteredGrades = loadedGrades; // Update filtered grades with loaded grades
     });
+  }
+
+  // This method filters the grades based on search input
+  void _filterGrades() {
+    final query = searchController.text.toLowerCase();
+    setState(() {
+      filteredGrades = grades.where((grade) {
+        return grade.sid.toLowerCase().contains(query) ||
+            grade.grade.toLowerCase().contains(query);
+      }).toList();
+    });
+  }
+
+  @override
+  void dispose() {
+    searchController.dispose(); // Dispose the controller when no longer needed
+    super.dispose();
   }
 
   Future<void> _addGrade() async {
@@ -137,16 +159,17 @@ class _ListGradesState extends State<ListGrades> {
     }
   }
 
-  Future<void> _editGrade(int index) async {
+  // Updated editGrade method to accept a Grade object
+  Future<void> _editGrade(Grade grade) async {
     final editedGrade = await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => GradeForm(grade: grades[index]),
+        builder: (context) => GradeForm(grade: grade),
       ),
     );
     if (editedGrade != null) {
       await GradesModel().updateGrade(editedGrade);
-      _loadGrades();
+      _loadGrades(); // Reload grades after editing
     }
   }
 
@@ -155,15 +178,19 @@ class _ListGradesState extends State<ListGrades> {
       switch (sortOption) {
         case 'sid_asc':
           grades.sort((a, b) => a.sid.compareTo(b.sid));
+          filteredGrades.sort((a, b) => a.sid.compareTo(b.sid));
           break;
         case 'sid_desc':
           grades.sort((a, b) => b.sid.compareTo(a.sid));
+          filteredGrades.sort((a, b) => b.sid.compareTo(a.sid));
           break;
         case 'grade_asc':
-          grades.sort((a, b) => a.grade.compareTo(b.grade));
+          grades.sort((a, b) => b.grade.compareTo(a.grade));
+          filteredGrades.sort((a, b) => b.grade.compareTo(a.grade));
           break;
         case 'grade_desc':
-          grades.sort((a, b) => b.grade.compareTo(a.grade));
+          grades.sort((a, b) => a.grade.compareTo(b.grade));
+          filteredGrades.sort((a, b) => a.grade.compareTo(b.grade));
           break;
       }
     });
@@ -171,9 +198,10 @@ class _ListGradesState extends State<ListGrades> {
 
 
 
-  Future<void> _deleteGrade(int index) async {
-    await GradesModel().deleteGradeById(grades[index].id!);
-    _loadGrades();
+  // Updated deleteGrade method to accept a Grade object
+  Future<void> _deleteGrade(Grade grade) async {
+    await GradesModel().deleteGradeById(grade.id!);
+    _loadGrades(); // Reload grades after deletion
   }
 
   void _showGradeChart() {
@@ -341,48 +369,67 @@ class _ListGradesState extends State<ListGrades> {
         ],
       ),
 
-      body: ListView.builder(
-        itemCount: grades.length,
-        itemBuilder: (context, index) {
-          return GestureDetector(
-            onLongPress: () async {
-              final result = await showMenu(
-                context: context,
-                position: RelativeRect.fromLTRB(100, 100, 100, 100),
-                items: [
-                  PopupMenuItem(
-                    value: 'edit',
-                    child: Text('Edit'),
-                  ),
-                ],
-              );
-
-              if (result == 'edit') {
-                _editGrade(index);
-              }
-            },
-            child: Dismissible(
-              key: ValueKey(grades[index].id),
-              background: Container(
-                color: Colors.red,
-                alignment: Alignment.centerRight,
-                padding: EdgeInsets.only(right: 20),
-                child: Icon(Icons.delete, color: Colors.white),
-              ),
-              direction: DismissDirection.endToStart,
-              onDismissed: (direction) {
-                _deleteGrade(index);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text("Grade deleted")),
-                );
-              },
-              child: ListTile(
-                title: Text(grades[index].sid),
-                subtitle: Text(grades[index].grade),
+      body: Column(
+        children: [
+          // Search bar
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: TextField(
+              controller: searchController,
+              decoration: InputDecoration(
+                hintText: 'Search by Student ID or Grade',
+                prefixIcon: Icon(Icons.search),
+                border: OutlineInputBorder(),
               ),
             ),
-          );
-        },
+          ),
+          // List of filtered grades
+          Expanded(
+            child: ListView.builder(
+              itemCount: filteredGrades.length,
+              itemBuilder: (context, index) {
+                return GestureDetector(
+                  onLongPress: () async {
+                    final result = await showMenu(
+                      context: context,
+                      position: RelativeRect.fromLTRB(100, 100, 100, 100),
+                      items: [
+                        PopupMenuItem(
+                          value: 'edit',
+                          child: Text('Edit'),
+                        ),
+                      ],
+                    );
+
+                    if (result == 'edit') {
+                      _editGrade(filteredGrades[index]); // Pass the correct grade object for editing
+                    }
+                  },
+                  child: Dismissible(
+                    key: ValueKey(filteredGrades[index].id), // Use filteredGrades
+                    background: Container(
+                      color: Colors.red,
+                      alignment: Alignment.centerRight,
+                      padding: EdgeInsets.only(right: 20),
+                      child: Icon(Icons.delete, color: Colors.white),
+                    ),
+                    direction: DismissDirection.endToStart,
+                    onDismissed: (direction) {
+                      _deleteGrade(filteredGrades[index]); // Use the grade object for deletion
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text("Grade deleted")),
+                      );
+                    },
+                    child: ListTile(
+                      title: Text(filteredGrades[index].sid),
+                      subtitle: Text(filteredGrades[index].grade),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
       ),
 
       floatingActionButton: FloatingActionButton(
