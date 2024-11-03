@@ -1,8 +1,14 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'grades_model.dart';
 import 'grade.dart';
 import 'grade_form.dart';
 import 'package:charts_flutter/flutter.dart' as charts;
+import 'package:flutter/services.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:csv/csv.dart';
+import 'dart:io';
 
 void main() {
   runApp(const MyApp());
@@ -202,6 +208,54 @@ class _ListGradesState extends State<ListGrades> {
     );
   }
 
+  Future<void> _importGrades() async {
+    // Use File Picker to select the CSV file
+    try {
+      FilePickerResult? result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['csv'],
+      );
+
+      if (result != null && result.files.isNotEmpty) {
+        String filePath = result.files.single.path!;
+
+        // Read the CSV file
+        final input = File(filePath).openRead();
+        List<List<dynamic>> rows = [];
+        try {
+          // Parse the CSV file
+          await input.transform(utf8.decoder).transform(const CsvToListConverter()).forEach((row) {
+            rows.add(row);
+          });
+
+          // Append the grades to the existing list
+          for (int i = 0; i < rows.length; i++) {
+            var row = rows[i];
+            // Skip the first row by checking the index
+            if (i == 0) continue; // This skips the header row
+
+            if (row.length >= 2) {
+              String sid = row[0].toString();
+              String grade = row[1].toString();
+              Grade newGrade = Grade(sid: sid, grade: grade);
+              await GradesModel().insertGrade(newGrade);
+            }
+          }
+          // Reload the grades
+          _loadGrades();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Grades imported successfully!')),
+          );
+        } catch (e) {
+          print("Error reading CSV file: $e");
+        }
+      }
+    } catch (e) {
+      print('Error: $e'); // Print the error for debugging
+    }
+
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -209,6 +263,10 @@ class _ListGradesState extends State<ListGrades> {
       appBar: AppBar(
         title: Text('List of Grades'),
         actions: [
+          IconButton(
+            icon: Icon(Icons.import_export), // Use an appropriate icon
+            onPressed: _importGrades, // Call the import function
+          ),
           IconButton(
             icon: Icon(Icons.bar_chart),
             onPressed: _showGradeChart,
