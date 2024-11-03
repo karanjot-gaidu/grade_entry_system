@@ -92,6 +92,26 @@ class _ListGradesState extends State<ListGrades> {
     }
   }
 
+  void _sortGrades(String sortOption) {
+    setState(() {
+      switch (sortOption) {
+        case 'sid_asc':
+          grades.sort((a, b) => a.sid.compareTo(b.sid));
+          break;
+        case 'sid_desc':
+          grades.sort((a, b) => b.sid.compareTo(a.sid));
+          break;
+        case 'grade_asc':
+          grades.sort((a, b) => a.grade.compareTo(b.grade));
+          break;
+        case 'grade_desc':
+          grades.sort((a, b) => b.grade.compareTo(a.grade));
+          break;
+      }
+    });
+  }
+
+
 
   Future<void> _deleteGrade(int index) async {
     await GradesModel().deleteGradeById(grades[index].id!);
@@ -103,8 +123,32 @@ class _ListGradesState extends State<ListGrades> {
     return Scaffold(
       appBar: AppBar(
         title: Text('List of Grades'),
-
+        actions: [
+          PopupMenuButton<String>(
+            icon: Icon(Icons.sort),
+            onSelected: _sortGrades,
+            itemBuilder: (context) => [
+              PopupMenuItem(
+                value: 'sid_asc',
+                child: Text('Sort by SID (Ascending)'),
+              ),
+              PopupMenuItem(
+                value: 'sid_desc',
+                child: Text('Sort by SID (Descending)'),
+              ),
+              PopupMenuItem(
+                value: 'grade_asc',
+                child: Text('Sort by Grade (Ascending)'),
+              ),
+              PopupMenuItem(
+                value: 'grade_desc',
+                child: Text('Sort by Grade (Descending)'),
+              ),
+            ],
+          ),
+        ],
       ),
+
       body: ListView.builder(
         itemCount: grades.length,
         itemBuilder: (context, index) {
