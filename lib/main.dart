@@ -9,6 +9,9 @@ import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:csv/csv.dart';
 import 'dart:io';
+import 'package:path_provider/path_provider.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
 
 void main() {
   runApp(const MyApp());
@@ -256,6 +259,38 @@ class _ListGradesState extends State<ListGrades> {
 
   }
 
+  Future<void> exportGradesToPDF() async {
+    final pdf = pw.Document();
+    List<Grade> grades = await GradesModel().getAllGrades();
+
+    pdf.addPage(
+      pw.Page(
+        build: (pw.Context context) {
+          return pw.Column(
+            children: [
+              pw.Text('Grades List', style: pw.TextStyle(fontSize: 24)),
+              pw.SizedBox(height: 20),
+              pw.Table.fromTextArray(
+                headers: ['Student ID', 'Grade'],
+                data: grades
+                    .map((grade) => [grade.sid, grade.grade])
+                    .toList(),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    // Save the PDF file
+    final output = Directory('/storage/emulated/0/Download');
+    final file = File('${output!.path}/grades.pdf');
+    await file.writeAsBytes(await pdf.save());
+
+    // Optionally, show a message that the file is saved
+    print('PDF saved to: ${file.path}');
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -266,6 +301,16 @@ class _ListGradesState extends State<ListGrades> {
           IconButton(
             icon: Icon(Icons.import_export), // Use an appropriate icon
             onPressed: _importGrades, // Call the import function
+          ),
+          IconButton(
+            icon: Icon(Icons.picture_as_pdf),
+            onPressed: () async {
+              await exportGradesToPDF();
+              // Optionally, show a snackbar to confirm the export
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Grades exported to PDF')),
+              );
+            },
           ),
           IconButton(
             icon: Icon(Icons.bar_chart),
